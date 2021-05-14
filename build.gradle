@@ -1,0 +1,21 @@
+plugins {
+    id 'groovy'
+    id 'java'
+}
+
+group 'de.geobe'
+version '0.9'
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.codehaus.groovy:groovy-all:3.0.8'
+    testImplementation group: 'org.spockframework', name: 'spock-core', version: '2.0-M5-groovy-3.0'
+
+}
+
+test {
+    useJUnitPlatform()
+}
