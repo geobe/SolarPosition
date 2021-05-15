@@ -17,7 +17,7 @@ class JulianDay {
      * @param minute 0 .. 59
      * @param second 0 .. 59
      * @param gregorian if true, use Gregorian calendar, else Julian
-     * @return Julian Date a a double value
+     * @return Julian Date as a double value
      */
     def jD(long year, long month, long day,
            long hour = 0, long minute = 0, long second = 0, boolean gregorian = true) {
