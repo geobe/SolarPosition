@@ -34,6 +34,15 @@ import static java.lang.Math.*
  */
 class SolarPosition {
 
+    static atKarlMarx = [(double) 50.83600391781902, (double) 12.923330207171258]
+    static closeKarlMarx = [(double) 50.83566205621398, (double) 12.922939819131013]
+
+    static perspectiveMarx() {
+        def dlat = atKarlMarx[0] - closeKarlMarx[0]
+        def dlon = atKarlMarx[1] - closeKarlMarx[1]
+        def pspc = atan2(dlon, dlat) + PI
+        [perspective: toDegrees(pspc), pspc: pspc]
+    }
     JulianDay julianDay = new JulianDay()
 
     /**
@@ -75,6 +84,10 @@ class SolarPosition {
         def azimuthRad = atan(sin(tauRad) / divisor)
         if (divisor < 0.0) {
             azimuthRad += PI
+        }
+        // azimuth angles > 180° transformed to negative angles
+        if(azimuthRad > PI) {
+            azimuthRad -= 2 * PI
         }
         // calculate elevation angle
         def elevRad = asin(cos(deltaRad) * cos(tauRad) * cos(phiRad) + sin(deltaRad) * sin(phiRad))
