@@ -34,25 +34,49 @@ class SolarGraph {
         longitude = lon
     }
 
-    def csvPlot(long year, long month, long day){
+    def csvPlot(long year, List<List<Long>> date) {
         StringBuffer values = new StringBuffer()
-        for (long min = 60; min < 1440; min += 15){
+        StringBuffer hourazi = new StringBuffer()
+        StringBuffer hourelv = new StringBuffer()
+        for (long min = 180; min < 1260; min += 15) {
             long minh = min % 60
             long h = min / 60
-            def coordinates = solarPosition.solarCoordinates(year, month, day, h, minh, latitude, longitude)
-            def azimuth = coordinates.azimuth
-            def elevation = coordinates.elevation
-//            values.add([h, minh, azimuth, elevation])
-            def line = String.format('%2d:%02d; % 6.2f; % 6.2f%n', h, minh, azimuth, elevation)
-//            print line //"$h, $minh, $azimuth, $elevation"
-            values.append line
+            def time = String.format('%2d:%02d; ', h, minh)
+            values.append time
+            if (minh == 0) {
+                hourazi.append time
+                hourelv.append time
+            }
+            date.each {
+                assert it.size() == 2
+                def month = it[0]
+                def day = it[1]
+                def coordinates = solarPosition.solarCoordinates(year, month, day, h, minh, latitude, longitude)
+                def azimuth = coordinates.azimuth
+                def elevation = coordinates.elevation
+                def line = String.format("${elevation >= 0.0 ? '% 7.2f; % 7.2f; ' : '       ;        ; '}", azimuth, elevation)
+                values.append line
+                if (minh == 0 && elevation >= -4.0) {
+                    hourelv.append String.format('% 7.2f; ', elevation)
+                    hourazi.append String.format('% 7.2f; ', azimuth)
+                }
+            }
+            values.append '\n'
+            if (minh == 0) {
+                hourazi.append('\n').append(hourelv).append '\n'
+                hourelv = new StringBuffer()
+            }
         }
+        values.append '\n'
+        values.append hourazi.toString()
+//        values.append hourelv.toString()
         values.toString()
     }
 
     static void main(String[] args) {
 //        new SolarGraph(SolarPosition.atKarlMarx[0], SolarPosition.atKarlMarx[1]).csvPlot(2021,6, 21)
-        def csv = new SolarGraph(49.0, 0.0).csvPlot(2021,3, 20)
+        def days = [[12, 21], [1, 20], [2, 18], [3, 20], [4, 20], [5, 21], [6, 21]]
+        def csv = new SolarGraph(50.83, 0.0).csvPlot(2021, days)
 //        print csv
         File csvFile = new File('/home/georg/tmp/tmp/solar.csv')
         csvFile.write csv
