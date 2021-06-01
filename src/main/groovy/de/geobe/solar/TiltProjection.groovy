@@ -48,20 +48,20 @@ class TiltProjection {
      * rRot = sqrt((sin(alpha)*cos(eps))**2 + sin(eps)**2). Its angle phi at the rotation axis can be determined
      * by atan(sin(eps) / (sin(alpha) * cos(eps)).<br>
      * T4 lies in the same Thales circle as T3, but with center angle phi + tilt. So its opposite leg is
-     * hRot = rRot * cos(phi + tilt). This is used to calculate tilted elevation.<br>
+     * hRot = rRot * sin(phi + tilt). This is used to calculate tilted elevation.<br>
      * All angles are in radians
      * @param tilt angle of the plane relative to horizontal
      * @param direction angle of the plane relative to geographic south, eastward is negative
      * @param azimuth angle of the sun relative to geographic south
      * @param eps elevation angle of the sun
-     * @return cosinus of elevation relative to tilted plane
+     * @return elevation angle relative to tilted plane
      */
-    def relativeElavation(double tilt, double direction, double azimuth, double eps) {
+    def relativeElevation(double tilt, double direction, double azimuth, double eps) {
         if (azimuth > PI) {
             azimuth -= 2 * PI
         }
         // problem is symmetric, so transform to positive angles
-        azimuth = abs(azimuth)
+//        azimuth = abs(azimuth)
         // plane angle perpendicular to direction is axis of rotation of the unit ball
         def axis = PI + direction
         // angle between rotation axis and azimuth
@@ -70,7 +70,7 @@ class TiltProjection {
         def t1adj = cos(eps)
         def t1opp = sin(eps)
         // T2 triangle opposite leg
-        def t2opp = sin(alpha) * cos(eps)
+        def t2opp = abs(sin(alpha) * t1adj)
         // T3 triangle hypothenuse and angle at axis
 //        def t3hyp2 = sqrt(t2opp**2 + t1opp**2)
         def phi = atan(t1opp / t2opp)
@@ -78,24 +78,31 @@ class TiltProjection {
 //        println "T3 Hypothenuse from Pythagoras = $t3hyp2, from sin = $t3hyp, diff = ${t3hyp - t3hyp2}"
         // T4 triangle opposite leg
         def t4opp = t3hyp * sin(phi + tilt)
-        return t4opp
+//        print "T1: $t1opp, $t1adj, 1, ${toDegrees(eps)}°; T2: ?, $t2opp, $t1adj, ${toDegrees(alpha)}°; "
+        println "T3: $t1opp, $t2opp, $t3hyp, ${toDegrees(phi)}°; T4: $t4opp, ?, ?, ${toDegrees(asin(t4opp))}°"
+        return asin(t4opp)
     }
 
     static void main(String[] args) {
-        def kmdeg = SolarPosition.perspectiveMarx().perspective - 180
-        def kmrad = SolarPosition.perspectiveMarx().pspc - PI
-        final tiltMarx = toRadians(-30.0)
-        println "Karl Marx looking to $kmdeg"
         def solpos = new SolarPosition()
+        def cfg = solpos.readConfig('sample.json')
+        println "analyzing "
+        def lat = cfg.location.lat
+        def lon = cfg.location.lon
+        def tilt = cfg.panel.inclination
+        def tiltrad = toRadians(tilt)
+        def kmdeg = cfg.panel.direction - 180
+        def kmrad = toRadians(kmdeg)
+        println "${cfg.name} looking to ${kmdeg + 180}° with tilt $tilt°"
         def tiltProjection = new TiltProjection()
-        // relative elevation of sun on Karl Marx head on 21.06.2021 from 5:00 to 20:00
-        for (long hour = 5; hour <= 20; hour++) {
-            def ll = solpos.solarCoordinates(2021, 6, 21, hour - 2, 0, SolarPosition.atKarlMarx[0], SolarPosition.atKarlMarx[1])
+        // relative elevation of sun on Karl Marx head on 21.06.2021 from 5:00 to 21:00
+        for (long hour = 5; hour <= 21; hour++) {
+            def ll = solpos.solarCoordinates(2021, 6, 21, hour - 2, 0, lat, lon)
             def azimuth = ll.azimuthRad
             def eps = ll.elevationRad
-            def releps = tiltProjection.relativeElavation(tiltMarx, kmrad, azimuth, eps)
-            def epsMarx = toDegrees(acos(releps))
-            println "At $hour.00: Azimuth = ${ll.azimuth}, Elevation = ${ll.elevation}, relative Elevation = $epsMarx"
+            def releps = tiltProjection.relativeElevation(tiltrad, kmrad, azimuth, eps)
+            def epsMarx = toDegrees(releps)
+            println "At $hour.00: Azimuth = ${ll.azimuth}°, Elevation = ${ll.elevation}°, relative Elevation = $epsMarx°"
         }
     }
 }

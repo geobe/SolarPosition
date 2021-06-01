@@ -24,6 +24,8 @@
 
 package de.geobe.solar
 
+import groovy.json.JsonSlurper
+
 import static java.lang.Math.*
 
 /**
@@ -34,15 +36,15 @@ import static java.lang.Math.*
  */
 class SolarPosition {
 
-    static atKarlMarx = [(double) 50.83600391781902, (double) 12.923330207171258]
-    static closeKarlMarx = [(double) 50.83566205621398, (double) 12.922939819131013]
-
-    static perspectiveMarx() {
-        def dlat = atKarlMarx[0] - closeKarlMarx[0]
-        def dlon = atKarlMarx[1] - closeKarlMarx[1]
-        def pspc = atan2(dlon, dlat) + PI
-        [perspective: toDegrees(pspc), pspc: pspc]
-    }
+//    static atKarlMarx = [(double) 50.83600391781902, (double) 12.923330207171258]
+//    static closeKarlMarx = [(double) 50.83566205621398, (double) 12.922939819131013]
+//
+//    static perspectiveMarx() {
+//        def dlat = atKarlMarx[0] - closeKarlMarx[0]
+//        def dlon = atKarlMarx[1] - closeKarlMarx[1]
+//        def pspc = atan2(dlon, dlat) + PI
+//        [perspective: toDegrees(pspc), pspc: pspc]
+//    }
     JulianDay julianDay = new JulianDay()
 
     /**
@@ -176,12 +178,22 @@ T0 = ${r.t0} \tthetaGh = ${r.thetaGh} \ttheta = ${r.theta}
 a = ${r.azimuth} \t\th = ${r.elevation} \t\t\thR = ${r.elevRefracted}"""
     }
 
-    /**
+    def readConfig(String filename) {
+        JsonSlurper slurper = new JsonSlurper()
+        URL cfgUrl = this.class.classLoader.getResource(filename)
+        File cfgFile = new File(cfgUrl.getPath())
+        def cfg = slurper.parse(cfgFile)
+        cfg
+    }
+
+/**
      * print solar position for Munich at 06.08.2006 8:00 CEST (= 6:00 UT), lat = 48.1°, lon = 11.6 E
      * see <a href="https://de.wikipedia.org/wiki/Sonnenstand#Beispiel>Solar Position example Munich</a> (in German)
      * @param args
      */
     static void main(String[] args) {
-        new SolarPosition().showResult(2006, 8, 6, 6, 0, 48.1, 11.6)
+//        println System.getProperty("java.class.path")
+        new SolarPosition().readConfig("config.json")
+//        new SolarPosition().showResult(2006, 8, 6, 6, 0, 48.1, 11.6)
     }
 }

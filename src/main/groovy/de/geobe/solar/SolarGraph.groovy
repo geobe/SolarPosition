@@ -29,7 +29,8 @@ class SolarGraph {
     double longitude
     SolarPosition solarPosition = new SolarPosition()
 
-    SolarGraph(double lat = 50.802368072602334, double lon = 12.956812953316136) {
+//    SolarGraph(double lat = 50.802368072602334, double lon = 12.956812953316136) {
+    SolarGraph(double lat = 50.83600391781902, double lon = 12.923330207171258) {
         latitude = lat
         longitude = lon
     }
@@ -38,7 +39,7 @@ class SolarGraph {
         StringBuffer values = new StringBuffer()
         StringBuffer hourazi = new StringBuffer()
         StringBuffer hourelv = new StringBuffer()
-        for (long min = 180; min < 1260; min += 15) {
+        for (long min = 180; min < 1260; min += 60) {
             long minh = min % 60
             long h = min / 60
             def time = String.format('%2d:%02d; ', h, minh)
