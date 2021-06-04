@@ -36,15 +36,6 @@ import static java.lang.Math.*
  */
 class SolarPosition {
 
-//    static atKarlMarx = [(double) 50.83600391781902, (double) 12.923330207171258]
-//    static closeKarlMarx = [(double) 50.83566205621398, (double) 12.922939819131013]
-//
-//    static perspectiveMarx() {
-//        def dlat = atKarlMarx[0] - closeKarlMarx[0]
-//        def dlon = atKarlMarx[1] - closeKarlMarx[1]
-//        def pspc = atan2(dlon, dlat) + PI
-//        [perspective: toDegrees(pspc), pspc: pspc]
-//    }
     JulianDay julianDay = new JulianDay()
 
     /**
@@ -56,8 +47,8 @@ class SolarPosition {
      * @param day
      * @param hour
      * @param minute
-     * @param latitude
-     * @param longitude
+     * @param latitude in degrees [-90° .. 90°], northern hemisphere is positive
+     * @param longitude in degrees [-180° .. 180°], eastward is negative
      * @return a map of all calculated values, if applicable, in degrees and radians
      */
     def solarCoordinates(long year, long month, long day, long hour, long minute, double latitude, double longitude) {
@@ -70,7 +61,7 @@ class SolarPosition {
         // Greenwich hour angle of spring point
         def thetaG = thetaGh * 15
         // local hour angle of spring point
-        def theta = thetaG + longitude
+        def theta = thetaG - longitude
         def thetaRad = toRadians(theta)
         def ecliptic = solarEclipticalCoordinates(year, month, day, hour, minute)
         // get right ascension and declination
@@ -193,7 +184,7 @@ a = ${r.azimuth} \t\th = ${r.elevation} \t\t\thR = ${r.elevRefracted}"""
      */
     static void main(String[] args) {
 //        println System.getProperty("java.class.path")
-        new SolarPosition().readConfig("config.json")
-//        new SolarPosition().showResult(2006, 8, 6, 6, 0, 48.1, 11.6)
+//        new SolarPosition().readConfig("config.json")
+        new SolarPosition().showResult(2006, 8, 6, 6, 0, 48.1, -11.6)
     }
 }
