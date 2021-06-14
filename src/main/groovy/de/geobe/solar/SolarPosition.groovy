@@ -26,6 +26,13 @@ package de.geobe.solar
 
 import groovy.json.JsonSlurper
 
+import java.time.LocalDate
+import java.time.Month
+import java.time.ZoneId
+import java.time.ZoneOffset
+import java.time.ZonedDateTime
+import java.time.temporal.ChronoField
+
 import static java.lang.Math.*
 
 /**
@@ -48,7 +55,7 @@ class SolarPosition {
      * @param hour
      * @param minute
      * @param latitude in degrees [-90° .. 90°], northern hemisphere is positive
-     * @param longitude in degrees [-180° .. 180°], eastward is negative
+     * @param longitude in degrees [-180° .. 180°], westward is negative
      * @return a map of all calculated values, if applicable, in degrees and radians
      */
     def solarCoordinates(long year, long month, long day, long hour, long minute, double latitude, double longitude) {
@@ -61,7 +68,7 @@ class SolarPosition {
         // Greenwich hour angle of spring point
         def thetaG = thetaGh * 15
         // local hour angle of spring point
-        def theta = thetaG - longitude
+        def theta = thetaG + longitude
         def thetaRad = toRadians(theta)
         def ecliptic = solarEclipticalCoordinates(year, month, day, hour, minute)
         // get right ascension and declination
@@ -79,7 +86,7 @@ class SolarPosition {
             azimuthRad += PI
         }
         // azimuth angles > 180° transformed to negative angles
-        if(azimuthRad > PI) {
+        if (azimuthRad > PI) {
             azimuthRad -= 2 * PI
         }
         // calculate elevation angle
@@ -149,6 +156,81 @@ class SolarPosition {
     }
 
     /**
+     * Get information about local time at a given longitude. The algorithm is really simplified
+     * as it assumes all time zones to be centered at multiples of 15° of longitude value.
+     * @param year
+     * @param month
+     * @param day
+     * @param lon geographic longitude [°]
+     * @param zoneId id of local timezone, default is operation system default
+     * @return a map with values <br>
+     * offset: timezone offset to UTC [sec] <br>
+     * localOffsetUTC: approximate offset of longitude position to UTC [sec]
+     * localOffset: offset within timezone
+     */
+    def localTimeInfo(int year, int month, int day, double lon, ZoneId zoneId = ZoneId.systemDefault()) {
+        def closest = Math.round(lon / 15)
+        // offset of solar local time to local timezone in seconds
+        def localOffset = Math.round((lon - closest * 15) * 240)
+        LocalDate localDate = LocalDate.of(year, month, day)
+        ZonedDateTime zonedDateTime = localDate.atStartOfDay(zoneId)
+        // offset of local time zone relative to UTC in seconds
+        def offset = zonedDateTime.getOffset().get(ChronoField.OFFSET_SECONDS)
+        return [offset        : offset,
+                localOffsetUTC: offset + localOffset,
+                localOffset   : localOffset]
+    }
+
+    /**
+     * create datasets representing solar position, intended as input into drawing methods.
+     * @param latitude
+     * @param longitude
+     * @param year of interest
+     * @param useSolarNoon if true (=default), calculate graph for true solar local time, else use time of local timezone
+     * @param calendarDays a list of [month, day] pairs for which solar positions are calculated
+     * @param zoneId calculate time stamps for this timezone, as default use system default
+     * @return a map of maps of XY value lists representing solar positions:<br>
+     * solarPaths: map with solar path azimuth and elevation angles for every hour on given calendar days<br>
+     * timedPositions: map with graphs linking azimuth and elevation angles for every calendar day at same hour
+     */
+    def solarPositionGraph(double latitude, double longitude, int year, boolean useSolarNoon = true,
+                           MonthDay[] calendarDays = MonthDay.sample, ZoneId zoneId = ZoneId.systemDefault()) {
+        def timeoffsetH = 0
+        def timeoffsetM = 0
+        def timeoffsetS = 0
+        def timeZoneOffset = 0
+        if (useSolarNoon) {
+            longitude = 0.0
+        }
+        def sunPaths = [:]
+        def timedPositions = [:]
+        calendarDays.each { day ->
+            def sunPath = []
+            if (!useSolarNoon) {
+                def toffset = localTimeInfo(year, day.month, day.day, longitude, zoneId)
+                timeoffsetS = toffset.localOffsetUTC
+                timeoffsetH = timeoffsetS.intdiv(3600)
+                timeoffsetM = Math.round(timeoffsetS / 60.0)
+                timeZoneOffset = toffset.offset.intdiv(3600)
+            }
+            (0..<24).each { hour ->
+                def val = solarCoordinates(year, day.month, day.day, hour - timeoffsetH, -timeoffsetM, latitude, longitude)
+                if (val.elevation > 0.0) {
+                    def xy = new XY(x: val.azimuth, y: val.elevation)
+                    sunPath << xy
+                    if (!timedPositions[(hour - timeZoneOffset)]) {
+                        timedPositions[(hour - timeZoneOffset)] = [xy]
+                    } else {
+                        timedPositions[(hour - timeZoneOffset)] << xy
+                    }
+                }
+            }
+            sunPaths[(day)] = sunPath
+        }
+        [sunpaths: sunPaths, timedPositions: timedPositions]
+    }
+
+    /**
      * Prepare output of relevant calculated values to make them comparable with a table in Wikipedia
      * @param year
      * @param month
@@ -169,6 +251,11 @@ T0 = ${r.t0} \tthetaGh = ${r.thetaGh} \ttheta = ${r.theta}
 a = ${r.azimuth} \t\th = ${r.elevation} \t\t\thR = ${r.elevRefracted}"""
     }
 
+    /**
+     * read basic configuration parameters from a JSON file
+     * @param filename
+     * @return a map representing the json file content
+     */
     def readConfig(String filename) {
         JsonSlurper slurper = new JsonSlurper()
         URL cfgUrl = this.class.classLoader.getResource(filename)
@@ -178,13 +265,54 @@ a = ${r.azimuth} \t\th = ${r.elevation} \t\t\thR = ${r.elevRefracted}"""
     }
 
 /**
-     * print solar position for Munich at 06.08.2006 8:00 CEST (= 6:00 UT), lat = 48.1°, lon = 11.6 E
-     * see <a href="https://de.wikipedia.org/wiki/Sonnenstand#Beispiel>Solar Position example Munich</a> (in German)
-     * @param args
-     */
+ * print solar position for Munich at 06.08.2006 8:00 CEST (= 6:00 UT), lat = 48.1°, lon = 11.6 E
+ * see <a href="https://de.wikipedia.org/wiki/Sonnenstand#Beispiel>Solar Position example Munich</a> (in German)
+ * @param args
+ */
     static void main(String[] args) {
-//        println System.getProperty("java.class.path")
-//        new SolarPosition().readConfig("config.json")
-        new SolarPosition().showResult(2006, 8, 6, 6, 0, 48.1, -11.6)
+        def solarPosition = new SolarPosition()
+        def cfg = solarPosition.readConfig('config.json')
+        def lon = cfg.location.lon
+        def lat = cfg.location.lat
+        def graphs = solarPosition.solarPositionGraph(lat, lon, 2021, false)
+        graphs.sunpaths.each { println it }
+        graphs.timedPositions.sort().each { println it }
+        def map = solarPosition.localTimeInfo(2021, 4, 20, lon)
+        println "$map"
+    }
+}
+
+/**
+ * put month and day into one structure
+ */
+class MonthDay {
+    static sample = [
+            new MonthDay(month: 12, day: 21),
+            new MonthDay(month: 1, day: 20),
+            new MonthDay(month: 2, day: 18),
+            new MonthDay(month: 3, day: 20),
+            new MonthDay(month: 4, day: 20),
+            new MonthDay(month: 5, day: 21),
+            new MonthDay(month: 6, day: 21),
+    ]
+    int month
+    int day
+
+    @Override
+    String toString() {
+        return "$day. ${Month.values()[month - 1].toString().substring(0,3)}".toString()
+    }
+}
+
+/**
+ * put coordinate pairs into one structure
+ */
+class XY {
+    double x
+    double y
+
+    @Override
+    String toString() {
+        String.format "(% 7.2f, % 7.2f)", x, y
     }
 }
