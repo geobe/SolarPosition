@@ -56,20 +56,35 @@ class TiltProjection {
      * def x2 = x1 * cos(tilt) + z1 * sin(tilt) <br>
      * def y2 = y1 <br>
      * def z2 = x1 * sin(tilt) + z1 * cos(tilt) <br>
-     * All angles are in radians
+     * All angles are in degrees
      * @param tilt angle of the plane relative to horizontal
-     * @param direction angle of the plane relative to geographic south, eastward is negative
+     * @param direction compass angle of the plane normal
      * @param azimuth angle of the sun relative to geographic south
      * @param eps elevation angle of the sun
      * @return elevation angle relative to tilted plane
      */
     def relativeElevation(double tilt, double direction, double azimuth, double eps) {
-        if (azimuth > PI) {
-            azimuth -= 2 * PI
+        def tiltRad = toRadians tilt
+        def directionRad = toRadians (direction - 180.0)
+        def azimuthRad = toRadians azimuth
+        def epsRad = toRadians eps
+        if (azimuthRad > PI) {
+            azimuthRad -= 2 * PI
         }
-        // bringing all transformations into one line of code
-        def z2 = (cos(eps) * cos(azimuth) * cos(direction) + cos(eps) * sin(azimuth) * sin(direction)) * sin(tilt) +
-                sin(eps) * cos(tilt)
+        def x0 = cos(epsRad) * cos(azimuthRad)
+        def y0 = -cos(epsRad) * sin(azimuthRad)
+        def z0 = sin(epsRad)
+//                rotate direction angle around z axis
+        def x1 = x0 * cos(directionRad) - y0 * sin(directionRad)
+        def y1 = x0 * sin(directionRad) + y0 * cos(directionRad)
+        def z1 = z0
+//        rotate tilt angle around new y1 axis - we are only interested in z" <br>
+        def x2 = x1 * cos(tiltRad) + z1 * sin(tiltRad)
+        def y2 = y1
+        def z2 = x1 * sin(tiltRad) + z1 * cos(tiltRad)
+                // bringing all transformations into one line of code
+//        def z2 = (cos(eps) * cos(azimuth) * cos(direction) + cos(eps) * sin(azimuth) * sin(direction)) * sin(tilt) +
+//                sin(eps) * cos(tilt)
         asin z2
     }
 

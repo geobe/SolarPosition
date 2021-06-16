@@ -25,6 +25,7 @@
 package de.geobe.solar
 
 import groovy.json.JsonSlurper
+import groovy.transform.Sortable
 
 import java.time.LocalDate
 import java.time.Month
@@ -182,18 +183,26 @@ class SolarPosition {
     }
 
     /**
-     * create datasets representing solar position, intended as input into drawing methods.
+     * create datasets representing solar position, absolute and in relation to twisted and tilted solar panel,
+     * intended as input into drawing methods. Latitude and longitude in degrees, e.g. as given by Google maps.
      * @param latitude
      * @param longitude
      * @param year of interest
      * @param useSolarNoon if true (=default), calculate graph for true solar local time, else use time of local timezone
+     * @param tilt Inclination of panel relative to earth surface in its direction.
+     * @param direction horizontal compass direction of the surface normal.
      * @param calendarDays a list of [month, day] pairs for which solar positions are calculated
      * @param zoneId calculate time stamps for this timezone, as default use system default
      * @return a map of maps of XY value lists representing solar positions:<br>
      * solarPaths: map with solar path azimuth and elevation angles for every hour on given calendar days<br>
      * timedPositions: map with graphs linking azimuth and elevation angles for every calendar day at same hour
+     * panelExpositions: map with graphs showing relative elevation in relation to solar panels
+     * panelYields: map with graphs showing relative yield (i.e sin(elevation)) for solar panels per hour
+     * totalPanelYield: graph showing day-integrated yield per date
      */
-    def solarPositionGraph(double latitude, double longitude, int year, boolean useSolarNoon = true,
+    def solarPositionGraph(double latitude, double longitude, int year,
+                           boolean useSolarNoon = true,
+                           double tilt = 0, double direction = 0,
                            MonthDay[] calendarDays = MonthDay.sample, ZoneId zoneId = ZoneId.systemDefault()) {
         def timeoffsetH = 0
         def timeoffsetM = 0
@@ -204,8 +213,15 @@ class SolarPosition {
         }
         def sunPaths = [:]
         def timedPositions = [:]
+        def panelExpositions = [:]
+        def panelYields = [:]
+        def totalPanelYield = [:]
+        def tiltProjection = new TiltProjection()
         calendarDays.each { day ->
             def sunPath = []
+            def panelExposition = []
+            def panelYield = []
+            double totalYield = 0.0
             if (!useSolarNoon) {
                 def toffset = localTimeInfo(year, day.month, day.day, longitude, zoneId)
                 timeoffsetS = toffset.localOffsetUTC
@@ -215,19 +231,39 @@ class SolarPosition {
             }
             (0..<24).each { hour ->
                 def val = solarCoordinates(year, day.month, day.day, hour - timeoffsetH, -timeoffsetM, latitude, longitude)
-                if (val.elevation > 0.0) {
-                    def xy = new XY(x: val.azimuth, y: val.elevation)
+                // rely on cutoff of negative values by graphics software
+                def elevation = val.elevRefracted
+//                totalYield = 0.0
+                if (elevation >= -10.0) {
+                    def azimuth = val.azimuth
+                    def xy = new XY(x: azimuth, y: elevation)
                     sunPath << xy
+
                     if (!timedPositions[(hour - timeZoneOffset)]) {
                         timedPositions[(hour - timeZoneOffset)] = [xy]
                     } else {
                         timedPositions[(hour - timeZoneOffset)] << xy
                     }
+                    def epsilon = tiltProjection.relativeElevation(tilt, direction, azimuth, elevation)
+                    xy = new XY(x: azimuth, y: toDegrees(epsilon))
+                    panelExposition << xy
+                    xy = new XY(x: hour - timeZoneOffset, y: sin(epsilon))
+                    panelYield << xy
+                    totalYield += sin(epsilon)
                 }
             }
             sunPaths[(day)] = sunPath
+            panelExpositions[(day)] = panelExposition
+            panelYields[(day)] = panelYield
+            totalPanelYield[(day)] = totalYield
         }
-        [sunpaths: sunPaths, timedPositions: timedPositions]
+        [
+                sunpaths        : sunPaths,
+                timedPositions  : timedPositions,
+                panelExpositions: panelExpositions,
+                panelYields     : panelYields,
+                totalPanelYield : totalPanelYield
+        ]
     }
 
     /**
@@ -274,17 +310,29 @@ a = ${r.azimuth} \t\th = ${r.elevation} \t\t\thR = ${r.elevRefracted}"""
         def cfg = solarPosition.readConfig('config.json')
         def lon = cfg.location.lon
         def lat = cfg.location.lat
-        def graphs = solarPosition.solarPositionGraph(lat, lon, 2021, false)
+        def graphs = solarPosition.solarPositionGraph(lat, lon, 2021, true, 12.5, 198)
+        println 'sunpaths'
         graphs.sunpaths.each { println it }
-        graphs.timedPositions.sort().each { println it }
-        def map = solarPosition.localTimeInfo(2021, 4, 20, lon)
-        println "$map"
+//        println 'timed Positions'
+//        graphs.timedPositions.sort().each { println it }
+        println 'panel Expositions'
+        graphs.panelExpositions.each {println it}
+        println 'panel Yields'
+        graphs.panelYields.sort().each {println it}
+        print "totalPanelYield: "
+        graphs.totalPanelYield.each {k, v ->
+            printf('%s: % 5.2f, ', k.toString(), v)
+        }
+        println "\ntotalAnnualYield: ${graphs.totalPanelYield.collect { k, v -> v }.sum()}"
+//        def map = solarPosition.localTimeInfo(2021, 4, 20, lon)
+//        println "$map"
     }
 }
 
 /**
  * put month and day into one structure
  */
+@Sortable
 class MonthDay {
     static sample = [
             new MonthDay(month: 12, day: 21),
@@ -300,7 +348,7 @@ class MonthDay {
 
     @Override
     String toString() {
-        return "$day. ${Month.values()[month - 1].toString().substring(0,3)}".toString()
+        return "$day. ${Month.values()[month - 1].toString().substring(0, 3)}".toString()
     }
 }
 

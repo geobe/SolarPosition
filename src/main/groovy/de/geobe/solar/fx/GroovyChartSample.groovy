@@ -23,44 +23,151 @@
 
 package de.geobe.solar.fx
 
+import de.geobe.solar.SolarPosition
+import de.geobe.solar.XY
 import de.gsi.chart.XYChart
+import de.gsi.chart.axes.spi.CategoryAxis
 import de.gsi.chart.axes.spi.DefaultNumericAxis
 import de.gsi.dataset.spi.DoubleDataSet
+import de.gsi.dataset.spi.LabelledMarker
 import javafx.application.Application
+import javafx.geometry.Orientation
 import javafx.scene.Scene
-import javafx.scene.layout.StackPane
+import javafx.scene.control.Label
+import javafx.scene.control.SplitPane
+import javafx.scene.layout.Priority
+import javafx.scene.layout.VBox
+import javafx.scene.text.Font
 import javafx.stage.Stage
 
+import java.time.ZoneId
+
 class GroovyChartSample {
-    private static final int N_SAMPLES = 100
 
     void start(Stage primaryStage) throws Exception {
-        final StackPane root = new StackPane();
+        def top = new VBox();
+        def mid = new VBox();
+        def below = new VBox();
 
-        final XYChart chart = new XYChart(new DefaultNumericAxis(), new DefaultNumericAxis());
-        root.getChildren().add(chart);
+        def solarPosition = new SolarPosition()
+        def cfg = solarPosition.readConfig('config.json')
+        def lon = cfg.location.lon
+        def lat = cfg.location.lat
+        def direction = cfg.panel.direction
+        def tilt = cfg.panel.inclination
+        def year = 2021
+        def realNoon = true
 
-        final DoubleDataSet dataSet1 = new DoubleDataSet("data set #1");
-        final DoubleDataSet dataSet2 = new DoubleDataSet("data set #2");
-        // lineChartPlot.getDatasets().add(dataSet1); // for single data set
-        chart.getDatasets().addAll(dataSet1, dataSet2); // two data sets
+        def graphData1 = solarPosition.solarPositionGraph(lat, lon, year, realNoon, tilt, direction)
+        def graphData2 = solarPosition.solarPositionGraph(lat, lon, year, !realNoon, tilt, direction)
 
-        final double[] xValues = new double[N_SAMPLES];
-        final double[] yValues1 = new double[N_SAMPLES];
-        final double[] yValues2 = new double[N_SAMPLES];
-        for (int n = 0; n < N_SAMPLES; n++) {
-            xValues[n] = n;
-            yValues1[n] = Math.cos(Math.toRadians(10.0 * n));
-            yValues2[n] = Math.sin(Math.toRadians(10.0 * n));
-        }
-        dataSet1.set(xValues, yValues1);
-        dataSet2.set(xValues, yValues2);
+        def diag1 = makeSolarPositionChart(graphData2)
+        def diag2 = makePanelExpositionsChart(graphData2)
+        def diag3 = makePanelYieldChart(graphData2)
+        def label1 = new Label("Solar Position at ($lat, $lon) showing ${ZoneId.systemDefault()} time")
+        def label2 = new Label("Solar Panel Exposition at ($lat, $lon) with tilt $tilt looking at $direction°")
+        def label3 = new Label("Solar Panel Yield at ($lat, $lon) with tilt $tilt looking at $direction°")
+        label1.font = new Font('Arial', 24)
+        label2.font = new Font('Arial', 24)
+        label3.font = new Font('Arial', 24)
+        VBox.setVgrow(diag1, Priority.ALWAYS)
+        VBox.setVgrow(diag2, Priority.ALWAYS)
+        VBox.setVgrow(diag3, Priority.ALWAYS)
+        top.getChildren().addAll(label1, diag1)
+        mid.getChildren().addAll(label2, diag2)
+        below.getChildren().addAll(label3, diag3)
 
-        final Scene scene = new Scene(root, 800, 600);
-        primaryStage.setTitle(this.getClass().getSimpleName());
+        def splitPane = new SplitPane(top, mid, below)
+        splitPane.orientation = Orientation.VERTICAL
+        splitPane.dividerPositions = [0.33, 0.66]
+        final Scene scene = new Scene(splitPane, 1600, 1400);
+        primaryStage.setTitle("Solar Position Calculations");
         primaryStage.setScene(scene);
         primaryStage.setOnCloseRequest(evt -> System.exit(0));
         primaryStage.show();
+    }
+
+    XYChart makeSolarPositionChart(def graphData) {
+        def xAxis = new DefaultNumericAxis('Azimuth', -140, 140, 5)
+        def yAxis = new DefaultNumericAxis('Elevation', 0, 70, 5)
+        xAxis.unit='°'
+        yAxis.unit = '°'
+        final XYChart xyChart = new XYChart(xAxis, yAxis);
+        def sunpaths = graphData.sunpaths
+        def timedPositions = graphData.timedPositions
+        def datasets = []
+        sunpaths.each { Object timestamp, List sunpath ->
+            def dataset = new DoubleDataSet(timestamp.toString(), sunpath.size())
+            sunpath.each { XY value ->
+                dataset.add(value.x, value.y)
+            }
+            datasets << dataset
+        }
+        timedPositions.each { Object time, List positionAt ->
+            def dataset = new DoubleDataSet(time.toString(), positionAt.size())
+            positionAt.each { XY value ->
+                dataset.add(value.x, value.y)
+            }
+            def mark = new LabelledMarker(dataset.getX(0), time.toString())
+            mark.y = dataset.getY(0)
+            dataset.addDataLabel(0, time.toString())
+            datasets << dataset
+        }
+        xyChart.getDatasets().addAll(datasets)
+        xyChart
+    }
+
+    XYChart makePanelTotalYieldChart(def graphData) {
+        def xAxis = new CategoryAxis('Date')
+        def yAxis = new DefaultNumericAxis('Relative Yield', 0, 50, 5)
+//        yAxis.unit = ''
+        final XYChart xyChart = new XYChart(xAxis, yAxis);
+        def panelYield = graphData.panelYield
+            def dataset = new DoubleDataSet(timestamp.toString(), sunpath.size())
+            panelYield.each { XY value ->
+                dataset.add(value.x, value.y)
+            datasets << dataset
+        }
+        xyChart.getDatasets().add(dataset)
+        xyChart
+    }
+
+    XYChart makePanelExpositionsChart(def graphData) {
+        def xAxis = new DefaultNumericAxis('Azimuth', -140, 140, 5)
+        def yAxis = new DefaultNumericAxis('Elevation', 0, 90, 5)
+        xAxis.unit='°'
+        yAxis.unit = '°'
+        final XYChart xyChart = new XYChart(xAxis, yAxis);
+        def expositions = graphData.panelExpositions
+        def datasets = []
+        expositions.each { Object timestamp, List sunpath ->
+            def dataset = new DoubleDataSet(timestamp.toString(), sunpath.size())
+            sunpath.each { XY value ->
+                dataset.add(value.x, value.y)
+            }
+            datasets << dataset
+        }
+        xyChart.getDatasets().addAll(datasets)
+        xyChart
+    }
+
+    XYChart makePanelYieldChart(def graphData) {
+        def xAxis = new DefaultNumericAxis('Time')//, -140, 140, 5)
+        def yAxis = new DefaultNumericAxis('Yield', 0, 1, 5)
+        xAxis.unit='h'
+        yAxis.unit = '%'
+        final XYChart xyChart = new XYChart(xAxis, yAxis);
+        def yields = graphData.panelYields
+        def datasets = []
+        yields.each { Object timestamp, List yield ->
+            def dataset = new DoubleDataSet(timestamp.toString(), yield.size())
+            yield.each { XY value ->
+                dataset.add(value.x, value.y)
+            }
+            datasets << dataset
+        }
+        xyChart.getDatasets().addAll(datasets)
+        xyChart
     }
 
     static void main(String[] args) {
