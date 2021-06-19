@@ -217,6 +217,7 @@ class SolarPosition {
         def panelYields = [:]
         def totalPanelYield = [:]
         def tiltProjection = new TiltProjection()
+        def solarIntensity = new SolarIntensity()
         calendarDays.each { day ->
             def sunPath = []
             def panelExposition = []
@@ -247,9 +248,10 @@ class SolarPosition {
                     def epsilon = tiltProjection.relativeElevation(tilt, direction, azimuth, elevation)
                     xy = new XY(x: azimuth, y: toDegrees(epsilon))
                     panelExposition << xy
-                    xy = new XY(x: hour - timeZoneOffset, y: sin(epsilon))
+                    def solarIntensityNow = solarIntensity.relativeIntensity(90 - elevation)
+                    xy = new XY(x: hour - timeZoneOffset, y: sin(epsilon) * solarIntensityNow)
                     panelYield << xy
-                    totalYield += sin(epsilon)
+                    totalYield += sin(epsilon) * solarIntensityNow
                 }
             }
             sunPaths[(day)] = sunPath
