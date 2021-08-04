@@ -1,5 +1,21 @@
 {
   "name": "Karl Marx Forehead at Chemnitz",
-  "location": {"lat": 50.83600391781902,"lon": 15.0},
-  "panel": {"direction": 195.0, "inclination": -12.5}
+  "location": {
+    "lat": 50.836004,
+    "lon": 15.0
+  },
+  "panel": {
+    "direction": 195.0,
+    "inclination": 12.5
+  },
+  "weather": {
+    "baseurl": "http://api.openweathermap.org/data/2.5/",
+    "apikey": "1234567",
+    "verbs": [
+      "onecall",
+      "air_pollution",
+      "solar_radiation",
+      "solar_radiation/forecast"
+    ]
+  }
 }

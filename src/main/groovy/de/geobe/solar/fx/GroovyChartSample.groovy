@@ -54,7 +54,7 @@ class GroovyChartSample {
         def box5 = new VBox();
 
         def solarPosition = new SolarPosition()
-        def cfg = solarPosition.readConfig('config.json')
+        def cfg = SolarPosition.readConfig('sample.json')
 //        Lampertheim
 //        def lat = 49.590643
 //        def lon = 8.475496

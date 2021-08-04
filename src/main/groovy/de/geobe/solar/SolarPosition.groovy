@@ -47,6 +47,19 @@ class SolarPosition {
     JulianDay julianDay = new JulianDay()
 
     /**
+     * read basic configuration parameters from a JSON file
+     * @param filename
+     * @return a map representing the json file content
+     */
+    static readConfig(String filename) {
+        JsonSlurper slurper = new JsonSlurper()
+        URL cfgUrl = SolarPosition.classLoader.getResource(filename)
+        File cfgFile = new File(cfgUrl.getPath())
+        def cfg = slurper.parse(cfgFile)
+        cfg
+    }
+
+    /**
      * Calculate solar equatorial coordinates (azimuth, elevation) in degrees and radians.
      * Return all intermediate values for verification.
      *
@@ -289,18 +302,6 @@ T0 = ${r.t0} \tthetaGh = ${r.thetaGh} \ttheta = ${r.theta}
 a = ${r.azimuth} \t\th = ${r.elevation} \t\t\thR = ${r.elevRefracted}"""
     }
 
-    /**
-     * read basic configuration parameters from a JSON file
-     * @param filename
-     * @return a map representing the json file content
-     */
-    def readConfig(String filename) {
-        JsonSlurper slurper = new JsonSlurper()
-        URL cfgUrl = this.class.classLoader.getResource(filename)
-        File cfgFile = new File(cfgUrl.getPath())
-        def cfg = slurper.parse(cfgFile)
-        cfg
-    }
 
 /**
  * print solar position for Munich at 06.08.2006 8:00 CEST (= 6:00 UT), lat = 48.1°, lon = 11.6 E
